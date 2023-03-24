@@ -55,6 +55,8 @@ class AlexNet_v2(Model):
         x = self.classifier(x)
         return x
 
+    
+
 
 
 
