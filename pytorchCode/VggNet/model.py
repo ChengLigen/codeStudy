@@ -1,5 +1,13 @@
-import torch
 import torch.nn as nn
+import torch
+
+# official pretrain weights
+model_urls = {
+    'vgg11': 'https://download.pytorch.org/models/vgg11-bbd30ac9.pth',
+    'vgg13': 'https://download.pytorch.org/models/vgg13-c768596a.pth',
+    'vgg16': 'https://download.pytorch.org/models/vgg16-397923af.pth',
+    'vgg19': 'https://download.pytorch.org/models/vgg19-dcbb9e9d.pth'
+}
 
 
 class VGG(nn.Module):
@@ -7,19 +15,27 @@ class VGG(nn.Module):
         super(VGG, self).__init__()
         self.features = features
         self.classifier = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 4096),
-            nn.ReLU(inplace=True),
+            nn.Linear(512*7*7, 4096),
+            nn.ReLU(True),
             nn.Dropout(p=0.5),
             nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
+            nn.ReLU(True),
             nn.Dropout(p=0.5),
-            nn.Linear(4096, num_classes),
-            nn.ReLU(inplace=True)
+            nn.Linear(4096, num_classes)
         )
         if init_weights:
-            self._initialize_weihgts()
+            self._initialize_weights()
 
-    def _initialize_weihgts(self):
+    def forward(self, x):
+        # N x 3 x 224 x 224
+        x = self.features(x)
+        # N x 512 x 7 x 7
+        x = torch.flatten(x, start_dim=1)
+        # N x 512*7*7
+        x = self.classifier(x)
+        return x
+
+    def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -28,24 +44,19 @@ class VGG(nn.Module):
                     nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
+                # nn.init.normal_(m.weight, 0, 0.01)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
-        x = self.features(x)
-        x = torch.flatten(x, start_dim=1)
-        x = self.classifier(x)
 
-        return x
-
-
-def make_features(cfg):
-    in_channels = 3
+def make_features(cfg: list):
     layers = []
+    in_channels = 3
     for v in cfg:
         if v == "M":
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:
-            layers += [nn.Conv2d(in_channels, v, kernel_size=3, padding=1), nn.ReLU(inplace=True)]
+            conv2d = nn.Conv2d(in_channels, v, kernel_size=3, padding=1)
+            layers += [conv2d, nn.ReLU(True)]
             in_channels = v
     return nn.Sequential(*layers)
 
@@ -58,9 +69,9 @@ cfgs = {
 }
 
 
-def vgg(model_name='vgg16', **kwargs):
-    assert model_name in cfgs, "Warring {} is not in cfgs!".format(model_name)
+def vgg(model_name="vgg16", **kwargs):
+    assert model_name in cfgs, "Warning: model number {} not in cfgs dict!".format(model_name)
     cfg = cfgs[model_name]
-    print(cfg)
+
     model = VGG(make_features(cfg), **kwargs)
     return model
